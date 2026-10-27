@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -107,6 +108,21 @@ class TransactionControllerTest {
                 .andExpect(view().name("transactions/form"))
                 .andExpect(model().attributeHasFieldErrors("transactionForm", "amount"))
                 .andExpect(model().attributeExists("categories", "transactionTypes"));
+    }
+
+    @Test
+    void rejectsNegativeTransactionAmountWithoutCallingService() throws Exception {
+        mockMvc.perform(post("/transactions")
+                        .param("type", "EXPENSE")
+                        .param("amount", "-4.00")
+                        .param("transactionDate", "2026-10-16")
+                        .param("description", "Lunch")
+                        .param("categoryId", "3"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("transactions/form"))
+                .andExpect(model().attributeHasFieldErrors("transactionForm", "amount"));
+
+        verifyNoInteractions(transactionService);
     }
 
     @Test

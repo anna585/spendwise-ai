@@ -91,6 +91,23 @@ class MonthlyBudgetServiceTest {
     }
 
     @Test
+    void rejectsBudgetForMissingCategory() {
+        when(categoryRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> budgetService.create(
+                YearMonth.of(2026, 10),
+                new BigDecimal("300.00"),
+                404L
+        )).isInstanceOf(CategoryNotFoundException.class)
+                .hasMessageContaining("404");
+
+        verify(budgetRepository, never()).existsByCategory_IdAndMonth(
+                404L, LocalDate.of(2026, 10, 1)
+        );
+        verify(budgetRepository, never()).save(any(MonthlyBudget.class));
+    }
+
+    @Test
     void rejectsBudgetForIncomeCategory() {
         Category incomeCategory = mock(Category.class);
         when(categoryRepository.findById(9L)).thenReturn(Optional.of(incomeCategory));
@@ -125,6 +142,19 @@ class MonthlyBudgetServiceTest {
         assertThat(updated.getMonth()).isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(updated.getAmount()).isEqualByComparingTo("400.00");
         verify(budgetRepository).save(existing);
+    }
+
+    @Test
+    void rejectsUpdateWhenBudgetDoesNotExist() {
+        when(budgetRepository.findByIdWithCategory(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> budgetService.update(
+                404L, YearMonth.of(2026, 10), new BigDecimal("400.00"), 4L
+        )).isInstanceOf(MonthlyBudgetNotFoundException.class)
+                .hasMessageContaining("404");
+
+        verify(categoryRepository, never()).findById(4L);
+        verify(budgetRepository, never()).save(any(MonthlyBudget.class));
     }
 
     @Test

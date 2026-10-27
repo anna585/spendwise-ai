@@ -2,6 +2,7 @@ package com.example.spendwise.controller;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,6 +16,7 @@ import com.example.spendwise.entity.TransactionType;
 import com.example.spendwise.service.BudgetReportRow;
 import com.example.spendwise.service.CategoryService;
 import com.example.spendwise.service.DuplicateMonthlyBudgetException;
+import com.example.spendwise.service.MonthlyBudgetNotFoundException;
 import com.example.spendwise.service.MonthlyBudgetService;
 import java.math.BigDecimal;
 import java.time.YearMonth;
@@ -77,6 +79,19 @@ class MonthlyBudgetControllerTest {
     }
 
     @Test
+    void rejectsNegativeBudgetAmountWithoutCallingService() throws Exception {
+        mockMvc.perform(post("/budgets")
+                        .param("month", "2026-10")
+                        .param("amount", "-25.00")
+                        .param("categoryId", "4"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("budgets/form"))
+                .andExpect(model().attributeHasFieldErrors("budgetForm", "amount"));
+
+        verifyNoInteractions(budgetService);
+    }
+
+    @Test
     void displaysDuplicateCategoryMonthMessageOnBudgetForm() throws Exception {
         when(categoryService.findAllByType(TransactionType.EXPENSE))
                 .thenReturn(List.of(new Category("Dining", TransactionType.EXPENSE)));
@@ -107,5 +122,16 @@ class MonthlyBudgetControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/budgets?month=2026-10"));
         verify(budgetService).delete(8L);
+    }
+
+    @Test
+    void returnsNotFoundPageWhenEditingMissingBudget() throws Exception {
+        when(budgetService.findById(404L))
+                .thenThrow(new MonthlyBudgetNotFoundException(404L));
+
+        mockMvc.perform(get("/budgets/404/edit"))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("budgets/not-found"))
+                .andExpect(model().attributeExists("errorMessage"));
     }
 }
